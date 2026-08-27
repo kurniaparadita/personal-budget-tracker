@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useBudget } from '@/context/BudgetContext';
 import BillDataTable from '@/components/dashboard/BillDataTable';
 import { FileWarning, CheckCircle2, AlertTriangle, Scale } from 'lucide-react';
@@ -7,6 +8,7 @@ import { formatRupiah } from '@/utils/format';
 import { Transaction } from '@/types/budget';
 
 export default function TagihanPage() {
+  const [activeTab, setActiveTab] = useState<string>('Semua');
   const { 
     transactions, 
     isLoading, 
@@ -28,8 +30,16 @@ export default function TagihanPage() {
 
   const bills = transactions.filter(t => t.category === 'Tagihan Online');
   
-  const totalLunas = bills.filter(t => t.status === 'Lunas').reduce((sum, t) => sum + Number(t.amount), 0);
-  const totalBelumLunas = bills.filter(t => t.status !== 'Lunas').reduce((sum, t) => sum + Number(t.amount), 0);
+  // Get bills based on active tab
+  const displayedBills = activeTab === 'Semua' 
+    ? bills 
+    : activeTab === 'Lainnya'
+      ? bills.filter(t => !['GoPay Later', 'ShopeePay Later', 'Tiktok PayLater'].includes(t.platform || ''))
+      : bills.filter(t => t.platform === activeTab);
+
+  // Calculate metrics based on the dynamically filtered bills
+  const totalLunas = displayedBills.filter(t => t.status === 'Lunas').reduce((sum, t) => sum + Number(t.amount), 0);
+  const totalBelumLunas = displayedBills.filter(t => t.status !== 'Lunas').reduce((sum, t) => sum + Number(t.amount), 0);
   const totalSemua = totalLunas + totalBelumLunas;
   
   // Calculate percentage for progress bar
@@ -59,7 +69,9 @@ export default function TagihanPage() {
               <FileWarning className="h-6 w-6" />
             </div>
             <div>
-              <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Total Harus Dibayar</p>
+              <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
+                {activeTab === 'Semua' ? 'Total Harus Dibayar' : `Tagihan ${activeTab}`}
+              </p>
               <p className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">{formatRupiah(totalBelumLunas)}</p>
             </div>
           </div>
@@ -111,16 +123,39 @@ export default function TagihanPage() {
         </div>
       </div>
 
+      {/* Tabs Filter Platform */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 mb-2">
+        <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Rincian Tagihan</h2>
+        
+        <div className="flex flex-wrap gap-2 sm:gap-1 bg-zinc-100 dark:bg-zinc-800/80 p-1 rounded-xl shadow-sm ring-1 ring-zinc-200/50 dark:ring-white/5 w-full sm:w-auto">
+          {['Semua', 'GoPay Later', 'ShopeePay Later', 'Tiktok PayLater', 'Lainnya'].map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all ${
+                activeTab === tab
+                  ? 'bg-white dark:bg-zinc-700 text-rose-600 dark:text-rose-400 shadow-sm'
+                  : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200'
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Main Data Table */}
-      <BillDataTable 
-        transactions={bills}
-        onAdd={() => openModal('Tagihan Online', 'expense')}
-        onEdit={openEditModal}
-        onDelete={handleDeleteTransaction}
-        onToggleStatus={toggleStatus}
-        onBulkDelete={handleBulkDeleteTransactions}
-        onBulkToggleStatus={handleBulkToggleStatus}
-      />
+      <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <BillDataTable 
+          transactions={displayedBills}
+          onAdd={() => openModal('Tagihan Online', 'expense')}
+          onEdit={openEditModal}
+          onDelete={handleDeleteTransaction}
+          onToggleStatus={toggleStatus}
+          onBulkDelete={handleBulkDeleteTransactions}
+          onBulkToggleStatus={handleBulkToggleStatus}
+        />
+      </div>
     </div>
   );
 }

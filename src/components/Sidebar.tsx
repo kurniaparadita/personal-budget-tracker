@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Wallet, Receipt, PiggyBank, Target } from 'lucide-react';
+import { LayoutDashboard, Wallet, Receipt, PiggyBank, Target, Archive } from 'lucide-react';
 import { useState } from 'react';
 
 const MENU_ITEMS = [
@@ -10,6 +10,7 @@ const MENU_ITEMS = [
   { id: '/transaksi', label: 'Transaksi', icon: Wallet },
   { id: '/tagihan', label: 'Tagihan Online', icon: Receipt },
   { id: '/tabungan', label: 'Tabungan & Tujuan', icon: Target },
+  { id: '/history', label: 'Riwayat Bulanan', icon: Archive },
 ];
 
 export default function Sidebar() {

@@ -1,12 +1,15 @@
 'use client';
 
+import { useState } from 'react';
 import { useBudget } from '@/context/BudgetContext';
 import SavingsLog from '@/components/dashboard/SavingsLog';
+import TransactionDataTable from '@/components/dashboard/TransactionDataTable';
 import { Target, ShieldAlert, TrendingUp } from 'lucide-react';
 import { formatRupiah } from '@/utils/format';
 
 export default function TabunganPage() {
-  const { transactions, isLoading, openModal, openEditModal, handleDeleteTransaction } = useBudget();
+  const { transactions, isLoading, openModal, openEditModal, handleDeleteTransaction, handleBulkDeleteTransactions } = useBudget();
+  const [activeTab, setActiveTab] = useState<'mutasi' | 'tujuan' | 'darurat'>('tujuan');
 
   if (isLoading) {
     return (
@@ -135,14 +138,79 @@ export default function TabunganPage() {
 
       </div>
 
-      {/* Mutasi Tabungan Table */}
-      <SavingsLog
-        title="Riwayat Mutasi Tabungan"
-        transactions={mutasiTxs}
-        onAdd={() => openModal('Tabungan', 'savings_in')}
-        onEdit={openEditModal}
-        onDelete={handleDeleteTransaction}
-      />
+      {/* Tabbed Tables Section */}
+      <div className="mt-8">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
+          <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Rincian Transaksi</h2>
+          
+          {/* Segmented Control for Tabs */}
+          <div className="flex bg-zinc-100 dark:bg-zinc-800/80 p-1 rounded-xl shadow-sm ring-1 ring-zinc-200/50 dark:ring-white/5 w-full sm:w-auto">
+            <button
+              onClick={() => setActiveTab('tujuan')}
+              className={`flex-1 sm:flex-none px-4 py-2 text-sm font-semibold rounded-lg transition-all ${
+                activeTab === 'tujuan'
+                  ? 'bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-400 shadow-sm'
+                  : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200'
+              }`}
+            >
+              Tujuan Tabungan
+            </button>
+            <button
+              onClick={() => setActiveTab('darurat')}
+              className={`flex-1 sm:flex-none px-4 py-2 text-sm font-semibold rounded-lg transition-all ${
+                activeTab === 'darurat'
+                  ? 'bg-white dark:bg-zinc-700 text-emerald-600 dark:text-emerald-400 shadow-sm'
+                  : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200'
+              }`}
+            >
+              Uang Darurat
+            </button>
+            <button
+              onClick={() => setActiveTab('mutasi')}
+              className={`flex-1 sm:flex-none px-4 py-2 text-sm font-semibold rounded-lg transition-all ${
+                activeTab === 'mutasi'
+                  ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm'
+                  : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200'
+              }`}
+            >
+              Mutasi Saldo
+            </button>
+          </div>
+        </div>
+
+        {/* Dynamic Table Content */}
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          {activeTab === 'mutasi' && (
+            <SavingsLog
+              title="Riwayat Mutasi Saldo Utama"
+              transactions={mutasiTxs}
+              onAdd={() => openModal('Tabungan', 'savings_in')}
+              onEdit={openEditModal}
+              onDelete={handleDeleteTransaction}
+            />
+          )}
+
+          {activeTab === 'tujuan' && (
+            <TransactionDataTable
+              transactions={tujuanTxs}
+              onAdd={() => openModal('Tujuan Tabungan', 'expense')}
+              onEdit={openEditModal}
+              onDelete={handleDeleteTransaction}
+              onBulkDelete={handleBulkDeleteTransactions}
+            />
+          )}
+
+          {activeTab === 'darurat' && (
+            <TransactionDataTable
+              transactions={daruratTxs}
+              onAdd={() => openModal('Uang Darurat', 'expense')}
+              onEdit={openEditModal}
+              onDelete={handleDeleteTransaction}
+              onBulkDelete={handleBulkDeleteTransactions}
+            />
+          )}
+        </div>
+      </div>
     </div>
   );
 }

@@ -30,3 +30,16 @@ export interface SummaryData {
   remainingBalance: number;
   status: 'AMAN' | 'OVERBUDGET';
 }
+
+export interface MonthlyHistory {
+  id: string;
+  created_at: string;
+  month: number; // 1-12
+  year: number;
+  total_income: number;
+  total_expense: number;
+  total_savings: number;
+  net_cash_flow: number;
+  notes?: string;
+  transactions_snapshot: Transaction[];
+}

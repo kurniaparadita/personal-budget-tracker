@@ -136,7 +136,7 @@ export default function TransactionSection({
                     </span>
                     
                     {/* Action Buttons Container */}
-                    <div className="flex items-center gap-1 absolute right-6 opacity-0 translate-x-4 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200 bg-zinc-50/80 dark:bg-zinc-800/90 p-1 rounded-lg backdrop-blur-sm">
+                    <div className="flex items-center gap-1 absolute right-4 sm:right-6 transition-all duration-200 bg-zinc-50/80 dark:bg-zinc-800/90 p-1 rounded-lg backdrop-blur-sm">
                       <button
                         onClick={() => onEdit(tx)}
                         className="p-1.5 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-500/10 dark:hover:text-blue-400 rounded-md transition-colors"

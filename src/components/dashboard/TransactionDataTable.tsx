@@ -189,7 +189,7 @@ export default function TransactionDataTable({
                       {isIncome ? '+' : '-'}{formatRupiah(tx.amount)}
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                      <div className="flex items-center justify-center gap-1 transition-all">
                         <button
                           onClick={() => onEdit(tx)}
                           className="p-1.5 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-500/10 dark:hover:text-blue-400 rounded-md transition-colors"

@@ -41,7 +41,7 @@ export default function AllocationChart({ data }: AllocationChartProps) {
   return (
     <div className="rounded-2xl bg-white dark:bg-zinc-900 p-6 shadow-sm ring-1 ring-zinc-200 dark:ring-zinc-800 flex flex-col h-full">
       <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-4">Persentase Alokasi Finansial</h3>
-      <div className="flex-1 min-h-[300px]">
+      <div className="flex-1 min-h-[350px]">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
@@ -60,8 +60,8 @@ export default function AllocationChart({ data }: AllocationChartProps) {
             <Tooltip content={<CustomTooltip />} />
             <Legend 
               verticalAlign="bottom" 
-              height={36}
               iconType="circle"
+              wrapperStyle={{ paddingTop: '20px' }}
               formatter={(value) => <span className="text-sm text-zinc-600 dark:text-zinc-300">{value}</span>}
             />
           </PieChart>
