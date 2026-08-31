@@ -10,7 +10,8 @@ const MENU_MAP: Record<string, string> = {
   '/': 'Dashboard Overview',
   '/transaksi': 'Pemasukan & Pengeluaran',
   '/tagihan': 'Tagihan Online',
-  '/tabungan': 'Tabungan & Uang Darurat'
+  '/tabungan': 'Tabungan & Uang Darurat',
+  '/history': 'Riwayat Bulanan'
 };
 
 export default function Header() {
