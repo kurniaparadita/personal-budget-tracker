@@ -1,13 +1,14 @@
-'use client';
-
 import { useState, useEffect } from 'react';
 import { Transaction, TransactionCategory, TransactionType } from '@/types/budget';
 import { X } from 'lucide-react';
+import { formatThousands, parseThousands, handleFormattedInputChange } from '@/utils/format';
 
 interface TransactionModalProps {
   isOpen: boolean;
-  onClose: () => void;
-  onSave: (data: Partial<Transaction>) => void;
+  onClose?: () => void;
+  onCloseAction?: () => void;
+  onSave?: (data: Partial<Transaction>) => void;
+  onSaveAction?: (data: Partial<Transaction>) => void;
   initialData?: Transaction | null;
   defaultCategory?: TransactionCategory;
   defaultType?: TransactionType;
@@ -28,11 +29,15 @@ const CATEGORIES: TransactionCategory[] = [
 export default function TransactionModal({
   isOpen,
   onClose,
+  onCloseAction,
   onSave,
+  onSaveAction,
   initialData,
   defaultCategory,
   defaultType
 }: TransactionModalProps) {
+  const handleClose = onCloseAction || onClose || (() => {});
+  const handleSave = onSaveAction || onSave || (() => {});
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState<TransactionCategory>(defaultCategory || 'Pengeluaran Wajib');
@@ -45,9 +50,14 @@ export default function TransactionModal({
     if (initialData) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setDescription(initialData.description);
-      setAmount(initialData.amount.toString());
+      setAmount(formatThousands(initialData.amount));
       setCategory(initialData.category);
-      setType(initialData.type);
+      const isInitialSavings = initialData.category === 'Tabungan' || initialData.category === 'Uang Darurat' || initialData.category === 'Tujuan Tabungan';
+      if (isInitialSavings && initialData.type !== 'savings_in' && initialData.type !== 'savings_out') {
+        setType('savings_in');
+      } else {
+        setType(initialData.type);
+      }
       setDate(initialData.date);
       setStatus(initialData.status || 'Pilih');
       setPlatform(initialData.platform || '');
@@ -64,7 +74,7 @@ export default function TransactionModal({
   }, [initialData, defaultCategory, defaultType, isOpen]);
 
   // Adjust available types based on category for better UX
-  const isSavings = category === 'Tabungan' || category === 'Uang Darurat';
+  const isSavings = category === 'Tabungan' || category === 'Uang Darurat' || category === 'Tujuan Tabungan';
   const isIncome = category === 'Pemasukan';
 
   useEffect(() => {
@@ -80,9 +90,12 @@ export default function TransactionModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave({
+    const numAmount = parseThousands(amount);
+    if (numAmount <= 0) return;
+
+    handleSave({
       description,
-      amount: Number(amount),
+      amount: numAmount,
       category,
       type,
       date,
@@ -99,7 +112,7 @@ export default function TransactionModal({
             {initialData ? 'Edit Transaksi' : 'Tambah Transaksi'}
           </h2>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100 p-1 rounded-md hover:bg-zinc-200 dark:hover:bg-zinc-800 transition-colors"
           >
             <X className="h-5 w-5" />
@@ -195,11 +208,11 @@ export default function TransactionModal({
               Nominal (Rp)
             </label>
             <input
-              type="number"
+              type="text"
+              inputMode="numeric"
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              onChange={(e) => handleFormattedInputChange(e, setAmount)}
               placeholder="0"
-              min="0"
               className="w-full rounded-lg border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border"
               required
             />
@@ -221,11 +234,28 @@ export default function TransactionModal({
               </select>
             </div>
           )}
+
+          {isSavings && (
+            <div>
+              <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                Sumber Dana Tabungan
+              </label>
+              <select
+                value={status === 'Pilih' || status === 'Lunas' || !status ? 'Potong Kas / Gaji Bulan Ini' : status}
+                onChange={(e) => setStatus(e.target.value)}
+                className="w-full rounded-lg border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-3 py-2 border"
+              >
+                <option value="Potong Kas / Gaji Bulan Ini">💳 Potong Kas / Gaji Bulan Berjalan (Memotong sisa saldo)</option>
+                <option value="Saldo Simpanan Yang Sudah Ada">🏦 Saldo Simpanan Yang Sudah Ada (Tidak memotong kas)</option>
+                <option value="Pemasukan Ekstra / Bonus">🎁 Pemasukan Ekstra / Bonus (Di luar gaji bulanan)</option>
+              </select>
+            </div>
+          )}
           
           <div className="pt-4 flex items-center justify-end gap-3 border-t border-zinc-200 dark:border-zinc-800 mt-6">
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleClose}
               className="px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
             >
               Batal

@@ -2,6 +2,7 @@
 
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { formatRupiah } from '@/utils/format';
+import { useBudget } from '@/context/BudgetContext';
 
 interface ChartData {
   name: string;
@@ -14,12 +15,14 @@ interface AllocationChartProps {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: any[] }) => {
+const CustomTooltip = ({ active, payload, isPrivacy }: { active?: boolean; payload?: any[]; isPrivacy?: boolean }) => {
   if (active && payload && payload.length) {
     return (
       <div className="bg-white dark:bg-zinc-800 p-3 rounded-lg shadow-lg border border-zinc-100 dark:border-zinc-700">
         <p className="font-medium text-zinc-900 dark:text-zinc-100">{payload[0].name}</p>
-        <p className="text-zinc-600 dark:text-zinc-300">{formatRupiah(payload[0].value)}</p>
+        <p className={`text-zinc-600 dark:text-zinc-300 ${isPrivacy ? 'font-mono' : ''}`}>
+          {formatRupiah(payload[0].value, isPrivacy)}
+        </p>
       </div>
     );
   }
@@ -27,6 +30,7 @@ const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: any[] 
 };
 
 export default function AllocationChart({ data }: AllocationChartProps) {
+  const { isPrivacyMode } = useBudget();
   // Filter out 0 values so they don't clutter the chart
   const activeData = data.filter((item) => item.value > 0);
 
@@ -57,7 +61,7 @@ export default function AllocationChart({ data }: AllocationChartProps) {
                 <Cell key={`cell-${index}`} fill={entry.color} stroke="transparent" />
               ))}
             </Pie>
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip content={<CustomTooltip isPrivacy={isPrivacyMode} />} />
             <Legend 
               verticalAlign="bottom" 
               iconType="circle"

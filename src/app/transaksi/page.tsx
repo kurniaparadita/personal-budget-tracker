@@ -4,13 +4,14 @@ import { useState } from 'react';
 import { useBudget } from '@/context/BudgetContext';
 import TransactionDataTable from '@/components/dashboard/TransactionDataTable';
 import { ArrowDownCircle, ArrowUpCircle, Activity } from 'lucide-react';
-import { formatRupiah } from '@/utils/format';
 
 export default function TransaksiPage() {
   const [activeTab, setActiveTab] = useState<string>('Semua');
   const { 
     transactions, 
     isLoading, 
+    isPrivacyMode,
+    formatCurrency,
     openModal, 
     openEditModal, 
     handleDeleteTransaction,
@@ -49,7 +50,7 @@ export default function TransaksiPage() {
             </div>
             <div>
               <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Total Arus Masuk</p>
-              <p className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">{formatRupiah(totalIncome)}</p>
+              <p className={`text-2xl font-bold tracking-tight text-zinc-900 dark:text-white ${isPrivacyMode ? 'font-mono' : ''}`}>{formatCurrency(totalIncome)}</p>
             </div>
           </div>
         )}
@@ -64,7 +65,7 @@ export default function TransaksiPage() {
               <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
                 {activeTab === 'Semua' ? 'Total Arus Keluar' : `Total ${activeTab}`}
               </p>
-              <p className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">{formatRupiah(totalExpense)}</p>
+              <p className={`text-2xl font-bold tracking-tight text-zinc-900 dark:text-white ${isPrivacyMode ? 'font-mono' : ''}`}>{formatCurrency(totalExpense)}</p>
             </div>
           </div>
         )}
@@ -77,7 +78,7 @@ export default function TransaksiPage() {
             </div>
             <div>
               <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Net Cash Flow</p>
-              <p className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">{netFlow >= 0 ? '+' : '-'}{formatRupiah(Math.abs(netFlow))}</p>
+              <p className={`text-2xl font-bold tracking-tight text-zinc-900 dark:text-white ${isPrivacyMode ? 'font-mono' : ''}`}>{netFlow >= 0 ? '+' : '-'}{formatCurrency(Math.abs(netFlow))}</p>
             </div>
           </div>
         )}
@@ -108,10 +109,10 @@ export default function TransaksiPage() {
       <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
         <TransactionDataTable 
           transactions={displayedTx}
-          onAdd={() => openModal()} // Removed default category so the dropdown shows
-          onEdit={openEditModal}
-          onDelete={handleDeleteTransaction}
-          onBulkDelete={handleBulkDeleteTransactions}
+          onAddAction={() => openModal()} // Removed default category so the dropdown shows
+          onEditAction={openEditModal}
+          onDeleteAction={handleDeleteTransaction}
+          onBulkDeleteAction={handleBulkDeleteTransactions}
         />
       </div>
     </div>

@@ -1,12 +1,16 @@
+'use client';
+
 import { ArrowDownCircle, ArrowUpCircle, Wallet, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { SummaryData } from '@/types/budget';
-import { formatRupiah } from '@/utils/format';
+import { useBudget } from '@/context/BudgetContext';
 
 interface SummaryCardsProps {
   data: SummaryData;
 }
 
 export default function SummaryCards({ data }: SummaryCardsProps) {
+  const { formatCurrency, isPrivacyMode } = useBudget();
+
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8">
       {/* Total Pemasukan */}
@@ -18,7 +22,9 @@ export default function SummaryCards({ data }: SummaryCardsProps) {
           </div>
           <div>
             <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Total Pemasukan</p>
-            <p className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">{formatRupiah(data.totalIncome)}</p>
+            <p className={`text-2xl font-bold tracking-tight text-zinc-900 dark:text-white ${isPrivacyMode ? 'font-mono tracking-wider' : ''}`}>
+              {formatCurrency(data.totalIncome)}
+            </p>
           </div>
         </div>
       </div>
@@ -32,7 +38,9 @@ export default function SummaryCards({ data }: SummaryCardsProps) {
           </div>
           <div>
             <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Total Pengeluaran</p>
-            <p className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">{formatRupiah(data.totalExpense)}</p>
+            <p className={`text-2xl font-bold tracking-tight text-zinc-900 dark:text-white ${isPrivacyMode ? 'font-mono tracking-wider' : ''}`}>
+              {formatCurrency(data.totalExpense)}
+            </p>
           </div>
         </div>
       </div>
@@ -46,7 +54,9 @@ export default function SummaryCards({ data }: SummaryCardsProps) {
           </div>
           <div>
             <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Sisa Saldo</p>
-            <p className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">{formatRupiah(data.remainingBalance)}</p>
+            <p className={`text-2xl font-bold tracking-tight text-zinc-900 dark:text-white ${isPrivacyMode ? 'font-mono tracking-wider' : ''}`}>
+              {formatCurrency(data.remainingBalance)}
+            </p>
           </div>
         </div>
       </div>

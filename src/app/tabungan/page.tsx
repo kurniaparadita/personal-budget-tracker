@@ -3,13 +3,26 @@
 import { useState } from 'react';
 import { useBudget } from '@/context/BudgetContext';
 import SavingsLog from '@/components/dashboard/SavingsLog';
-import TransactionDataTable from '@/components/dashboard/TransactionDataTable';
-import { Target, ShieldAlert, TrendingUp } from 'lucide-react';
-import { formatRupiah } from '@/utils/format';
+import SavingsGoalCard from '@/components/dashboard/SavingsGoalCard';
+import { SavingsGoal } from '@/types/budget';
+import { Plus, Target, PiggyBank, Sparkles, TrendingUp } from 'lucide-react';
 
 export default function TabunganPage() {
-  const { transactions, isLoading, openModal, openEditModal, handleDeleteTransaction, handleBulkDeleteTransactions } = useBudget();
-  const [activeTab, setActiveTab] = useState<'mutasi' | 'tujuan' | 'darurat'>('tujuan');
+  const { 
+    transactions, 
+    savingsGoals,
+    isLoading, 
+    isPrivacyMode,
+    formatCurrency,
+    openModal, 
+    openEditModal, 
+    handleDeleteTransaction,
+    openGoalModal,
+    handleDeleteGoal,
+    openGoalTxModal
+  } = useBudget();
+
+  const [activeTab, setActiveTab] = useState<'goals' | 'general'>('goals');
 
   if (isLoading) {
     return (
@@ -19,198 +32,187 @@ export default function TabunganPage() {
     );
   }
 
-  // Pisahkan transaksi berdasarkan kategori
-  const tujuanTxs = transactions.filter(t => t.category === 'Tujuan Tabungan');
-  const daruratTxs = transactions.filter(t => t.category === 'Uang Darurat');
-  const mutasiTxs = transactions.filter(t => t.category === 'Tabungan');
+  // Filter transaksi khusus untuk masing-masing tujuan
+  const getGoalTransactions = (goal: SavingsGoal) => {
+    return transactions.filter(t => {
+      // Direct link by goal_id or platform (which stores goal.id)
+      if (t.goal_id === goal.id || t.platform === goal.id) return true;
+      // Backward compatibility matching:
+      if (goal.id === 'goal-darurat' && t.category === 'Uang Darurat' && !t.platform) return true;
+      if (goal.id === 'goal-qurban' && t.description?.toLowerCase().includes('qurban') && !t.platform) return true;
+      if (goal.id === 'goal-laptop' && t.category === 'Tujuan Tabungan' && !t.platform) return true;
+      return false;
+    });
+  };
 
-  // Hitung total tabungan yang terkumpul
-  const totalTujuan = tujuanTxs.reduce((sum, t) => sum + Number(t.amount), 0);
-  const totalDarurat = daruratTxs.reduce((sum, t) => sum + Number(t.amount), 0);
-  
-  // Asumsikan target hardcoded sementara (idealnya ada di database, tapi kita buat UI mockup SaaS)
-  const targetTujuan = 15000000; // Rp 15 Juta
-  const targetDarurat = 10000000; // Rp 10 Juta
+  // Hitung akumulasi metrik seluruh tujuan
+  const goalMetrics = savingsGoals.map(goal => {
+    const txs = getGoalTransactions(goal);
+    const saved = txs.reduce((sum, t) => sum + (t.type === 'savings_out' ? -Number(t.amount) : Number(t.amount)), 0);
+    return {
+      target: Number(goal.target_amount) || 0,
+      saved: Math.max(0, saved)
+    };
+  });
 
-  const progressTujuan = Math.min(100, Math.round((totalTujuan / targetTujuan) * 100));
-  const progressDarurat = Math.min(100, Math.round((totalDarurat / targetDarurat) * 100));
+  const totalAllGoalsSaved = goalMetrics.reduce((sum, m) => sum + m.saved, 0);
+  const totalAllGoalsTarget = goalMetrics.reduce((sum, m) => sum + m.target, 0);
+  const avgProgress = totalAllGoalsTarget > 0 ? Math.min(100, Math.round((totalAllGoalsSaved / totalAllGoalsTarget) * 100)) : 0;
+
+  // Transaksi tabungan umum (unallocated / general savings)
+  const generalSavingsTxs = transactions.filter(t => t.category === 'Tabungan');
 
   return (
     <div className="space-y-8">
-      {/* SaaS Goal Tracking Section */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        
-        {/* Goal Card 1: Tujuan Tabungan */}
-        <div className="rounded-2xl bg-white/80 dark:bg-zinc-900/80 p-6 shadow-sm ring-1 ring-zinc-200/50 dark:ring-white/10 backdrop-blur-sm relative overflow-hidden group">
-          <div className="absolute right-0 top-0 h-full w-1/2 bg-gradient-to-l from-blue-500/5 to-transparent pointer-events-none"></div>
-          
-          <div className="flex items-start justify-between mb-8 relative z-10">
-            <div className="flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400">
-                <Target className="h-6 w-6" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Tujuan Tabungan</h3>
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">Gadget, Liburan, dll.</p>
-              </div>
-            </div>
-            <button 
-              onClick={() => openModal('Tujuan Tabungan', 'expense')}
-              className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 bg-blue-50 dark:bg-blue-500/10 px-3 py-1.5 rounded-lg transition-colors"
-            >
-              + Alokasi
-            </button>
-          </div>
-
-          <div className="space-y-3 relative z-10">
-            <div className="flex justify-between items-end">
-              <div>
-                <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-1">Terkumpul</p>
-                <p className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-white">{formatRupiah(totalTujuan)}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">Target: {formatRupiah(targetTujuan)}</p>
-                <span className="inline-flex items-center gap-1 font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 px-2 py-1 rounded text-sm">
-                  <TrendingUp className="h-3.5 w-3.5" /> {progressTujuan}%
-                </span>
-              </div>
-            </div>
-            
-            {/* Progress Bar */}
-            <div className="w-full bg-zinc-100 dark:bg-zinc-800 rounded-full h-3 overflow-hidden shadow-inner">
-              <div 
-                className="bg-blue-500 h-3 rounded-full transition-all duration-1000 ease-out relative overflow-hidden"
-                style={{ width: `${progressTujuan}%` }}
-              >
-                <div className="absolute inset-0 bg-white/20 w-full animate-[shimmer_2s_infinite]"></div>
-              </div>
-            </div>
-          </div>
+      
+      {/* Top Header & Mode Switcher */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
+            Tabungan & Pos Anggaran
+          </h1>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">
+            Kelola tujuan spesifik impian Anda atau pantau buku mutasi simpanan umum.
+          </p>
         </div>
 
-        {/* Goal Card 2: Uang Darurat */}
-        <div className="rounded-2xl bg-white/80 dark:bg-zinc-900/80 p-6 shadow-sm ring-1 ring-zinc-200/50 dark:ring-white/10 backdrop-blur-sm relative overflow-hidden group">
-          <div className="absolute right-0 top-0 h-full w-1/2 bg-gradient-to-l from-emerald-500/5 to-transparent pointer-events-none"></div>
-          
-          <div className="flex items-start justify-between mb-8 relative z-10">
-            <div className="flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-400">
-                <ShieldAlert className="h-6 w-6" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-zinc-900 dark:text-white">Uang Darurat</h3>
-                <p className="text-sm text-zinc-500 dark:text-zinc-400">Keamanan finansial.</p>
-              </div>
-            </div>
-            <button 
-              onClick={() => openModal('Uang Darurat', 'expense')}
-              className="text-sm font-medium text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 bg-emerald-50 dark:bg-emerald-500/10 px-3 py-1.5 rounded-lg transition-colors"
-            >
-              + Alokasi
-            </button>
-          </div>
+        {/* Segmented Mode Control */}
+        <div className="flex bg-zinc-100 dark:bg-zinc-800/80 p-1 rounded-2xl shadow-sm ring-1 ring-zinc-200/50 dark:ring-white/5 self-start sm:self-auto">
+          <button
+            onClick={() => setActiveTab('goals')}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl transition-all ${
+              activeTab === 'goals'
+                ? 'bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-400 shadow-sm'
+                : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200'
+            }`}
+          >
+            <Target className="h-4 w-4" />
+            <span>Tabungan Spesifik / Tujuan</span>
+            <span className="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 font-bold">
+              {savingsGoals.length}
+            </span>
+          </button>
 
-          <div className="space-y-3 relative z-10">
-            <div className="flex justify-between items-end">
-              <div>
-                <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400 mb-1">Terkumpul</p>
-                <p className="text-3xl font-bold tracking-tight text-zinc-900 dark:text-white">{formatRupiah(totalDarurat)}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1">Target: {formatRupiah(targetDarurat)}</p>
-                <span className="inline-flex items-center gap-1 font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-1 rounded text-sm">
-                  <TrendingUp className="h-3.5 w-3.5" /> {progressDarurat}%
-                </span>
-              </div>
-            </div>
-            
-            {/* Progress Bar */}
-            <div className="w-full bg-zinc-100 dark:bg-zinc-800 rounded-full h-3 overflow-hidden shadow-inner">
-              <div 
-                className="bg-emerald-500 h-3 rounded-full transition-all duration-1000 ease-out relative overflow-hidden"
-                style={{ width: `${progressDarurat}%` }}
-              >
-                <div className="absolute inset-0 bg-white/20 w-full animate-[shimmer_2s_infinite]"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-      {/* Tabbed Tables Section */}
-      <div className="mt-8">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
-          <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Rincian Transaksi</h2>
-          
-          {/* Segmented Control for Tabs */}
-          <div className="flex bg-zinc-100 dark:bg-zinc-800/80 p-1 rounded-xl shadow-sm ring-1 ring-zinc-200/50 dark:ring-white/5 w-full sm:w-auto">
-            <button
-              onClick={() => setActiveTab('tujuan')}
-              className={`flex-1 sm:flex-none px-4 py-2 text-sm font-semibold rounded-lg transition-all ${
-                activeTab === 'tujuan'
-                  ? 'bg-white dark:bg-zinc-700 text-blue-600 dark:text-blue-400 shadow-sm'
-                  : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200'
-              }`}
-            >
-              Tujuan Tabungan
-            </button>
-            <button
-              onClick={() => setActiveTab('darurat')}
-              className={`flex-1 sm:flex-none px-4 py-2 text-sm font-semibold rounded-lg transition-all ${
-                activeTab === 'darurat'
-                  ? 'bg-white dark:bg-zinc-700 text-emerald-600 dark:text-emerald-400 shadow-sm'
-                  : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200'
-              }`}
-            >
-              Uang Darurat
-            </button>
-            <button
-              onClick={() => setActiveTab('mutasi')}
-              className={`flex-1 sm:flex-none px-4 py-2 text-sm font-semibold rounded-lg transition-all ${
-                activeTab === 'mutasi'
-                  ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm'
-                  : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200'
-              }`}
-            >
-              Mutasi Saldo
-            </button>
-          </div>
-        </div>
-
-        {/* Dynamic Table Content */}
-        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-          {activeTab === 'mutasi' && (
-            <SavingsLog
-              title="Riwayat Mutasi Saldo Utama"
-              transactions={mutasiTxs}
-              onAdd={() => openModal('Tabungan', 'savings_in')}
-              onEdit={openEditModal}
-              onDelete={handleDeleteTransaction}
-            />
-          )}
-
-          {activeTab === 'tujuan' && (
-            <TransactionDataTable
-              transactions={tujuanTxs}
-              onAdd={() => openModal('Tujuan Tabungan', 'expense')}
-              onEdit={openEditModal}
-              onDelete={handleDeleteTransaction}
-              onBulkDelete={handleBulkDeleteTransactions}
-            />
-          )}
-
-          {activeTab === 'darurat' && (
-            <TransactionDataTable
-              transactions={daruratTxs}
-              onAdd={() => openModal('Uang Darurat', 'expense')}
-              onEdit={openEditModal}
-              onDelete={handleDeleteTransaction}
-              onBulkDelete={handleBulkDeleteTransactions}
-            />
-          )}
+          <button
+            onClick={() => setActiveTab('general')}
+            className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-xl transition-all ${
+              activeTab === 'general'
+                ? 'bg-white dark:bg-zinc-700 text-zinc-900 dark:text-white shadow-sm'
+                : 'text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200'
+            }`}
+          >
+            <PiggyBank className="h-4 w-4" />
+            <span>Tabungan Umum</span>
+          </button>
         </div>
       </div>
+
+      {/* MODE 1: TABUNGAN SPESIFIK / TUJUAN (MULTI-GOAL) */}
+      {activeTab === 'goals' && (
+        <div className="space-y-6 animate-in fade-in duration-300">
+          
+          {/* Goals Overview Hero Banner */}
+          <div className="rounded-3xl bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 p-6 sm:p-8 text-white shadow-lg relative overflow-hidden">
+            {/* Background Glows */}
+            <div className="absolute right-0 top-0 h-64 w-64 rounded-full bg-white/10 blur-3xl pointer-events-none"></div>
+            <div className="absolute -left-12 -bottom-12 h-64 w-64 rounded-full bg-blue-400/20 blur-2xl pointer-events-none"></div>
+            
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/15 text-xs font-semibold backdrop-blur-md">
+                  <Sparkles className="h-3.5 w-3.5 text-amber-300" />
+                  <span>Sistem Pos Tabungan Mandiri</span>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-bold tracking-tight">
+                  Terkumpul {isPrivacyMode ? 'Rp ••••••••' : formatCurrency(totalAllGoalsSaved)}
+                </h2>
+                <p className="text-blue-100 text-xs sm:text-sm max-w-xl">
+                  Dari total target akumulasi {formatCurrency(totalAllGoalsTarget)} untuk {savingsGoals.length} tujuan impian Anda.
+                </p>
+
+                {/* Micro Progress Bar */}
+                <div className="pt-2 max-w-md">
+                  <div className="flex justify-between text-xs font-semibold mb-1 text-blue-100">
+                    <span>Progress Akumulasi</span>
+                    <span className="flex items-center gap-1"><TrendingUp className="h-3 w-3" /> {avgProgress}%</span>
+                  </div>
+                  <div className="w-full bg-black/20 rounded-full h-2 overflow-hidden backdrop-blur-sm">
+                    <div 
+                      className="bg-white h-2 rounded-full transition-all duration-1000 ease-out"
+                      style={{ width: `${avgProgress}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Action: Buat Tujuan Baru */}
+              <button
+                onClick={() => openGoalModal()}
+                className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-white text-blue-700 hover:bg-blue-50 font-bold text-sm shadow-md transition-all active:scale-95 whitespace-nowrap self-start md:self-center"
+              >
+                <Plus className="h-4 w-4" />
+                Buat Tujuan Baru
+              </button>
+            </div>
+          </div>
+
+          {/* Dynamic Grid of SavingsGoalCard */}
+          {savingsGoals.length === 0 ? (
+            <div className="rounded-3xl border-2 border-dashed border-zinc-200 dark:border-zinc-800 p-12 text-center">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 mb-4">
+                <Target className="h-7 w-7" />
+              </div>
+              <h3 className="text-lg font-bold text-zinc-900 dark:text-white">
+                Belum ada kartu tujuan tabungan
+              </h3>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 max-w-md mx-auto mt-1 mb-6">
+                Buat pos tujuan tabungan Anda, misalnya Tabungan Qurban, Beli Laptop, atau Liburan Impian.
+              </p>
+              <button
+                onClick={() => openGoalModal()}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm shadow-sm transition-all active:scale-95"
+              >
+                <Plus className="h-4 w-4" />
+                Buat Tujuan Pertama
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              {savingsGoals.map((goal) => {
+                const goalTxs = getGoalTransactions(goal);
+                return (
+                  <SavingsGoalCard
+                    key={goal.id}
+                    goal={goal}
+                    transactions={goalTxs}
+                    onDeposit={(g) => openGoalTxModal(g, 'savings_in')}
+                    onWithdraw={(g) => openGoalTxModal(g, 'savings_out')}
+                    onEditGoal={(g) => openGoalModal(g)}
+                    onDeleteGoal={(goalId) => handleDeleteGoal(goalId)}
+                    onEditTransaction={(g, tx) => openGoalTxModal(g, tx.type === 'savings_out' ? 'savings_out' : 'savings_in', tx)}
+                    onDeleteTransaction={(txId) => handleDeleteTransaction(txId)}
+                  />
+                );
+              })}
+            </div>
+          )}
+
+        </div>
+      )}
+
+      {/* MODE 2: TABUNGAN UMUM (REGULER LEDGER) */}
+      {activeTab === 'general' && (
+        <div className="animate-in fade-in duration-300">
+          <SavingsLog
+            title="Buku Mutasi Tabungan Umum"
+            transactions={generalSavingsTxs}
+            onAdd={() => openModal('Tabungan', 'savings_in')}
+            onEdit={openEditModal}
+            onDelete={handleDeleteTransaction}
+          />
+        </div>
+      )}
+
     </div>
   );
 }

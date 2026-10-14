@@ -1,34 +1,57 @@
-'use client';
-
 import { Transaction } from '@/types/budget';
-import { formatRupiah, formatDate } from '@/utils/format';
+import { formatDate } from '@/utils/format';
 import { Pencil, Trash2, ArrowDownRight, ArrowUpRight, Plus, Search, Filter, CheckSquare, Square, Trash } from 'lucide-react';
 import { useState } from 'react';
+import { useBudget } from '@/context/BudgetContext';
 
 interface TransactionDataTableProps {
   transactions: Transaction[];
-  onAdd: () => void;
-  onEdit: (transaction: Transaction) => void;
-  onDelete: (id: string) => void;
+  onAdd?: () => void;
+  onAddAction?: () => void;
+  onEdit?: (transaction: Transaction) => void;
+  onEditAction?: (transaction: Transaction) => void;
+  onDelete?: (id: string) => void;
+  onDeleteAction?: (id: string) => void;
   onBulkDelete?: (ids: string[]) => void;
+  onBulkDeleteAction?: (ids: string[]) => void;
 }
 
 export default function TransactionDataTable({
   transactions,
   onAdd,
+  onAddAction,
   onEdit,
+  onEditAction,
   onDelete,
+  onDeleteAction,
   onBulkDelete,
+  onBulkDeleteAction,
 }: TransactionDataTableProps) {
+  const { 
+    formatCurrency, 
+    isPrivacyMode, 
+    openModal, 
+    openEditModal, 
+    handleDeleteTransaction, 
+    handleBulkDeleteTransactions 
+  } = useBudget();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'income' | 'expense'>('all');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  const handleAdd = onAddAction || onAdd || (() => openModal());
+  const handleEdit = onEditAction || onEdit || openEditModal;
+  const handleDelete = onDeleteAction || onDelete || handleDeleteTransaction;
+  const actualBulkDelete = onBulkDeleteAction || onBulkDelete;
+  const hasBulkDelete = Boolean(actualBulkDelete || handleBulkDeleteTransactions);
 
   const filteredTransactions = transactions.filter(tx => {
     // Basic search by description
     const matchesSearch = tx.description.toLowerCase().includes(searchTerm.toLowerCase());
     // Basic filter by type
-    const matchesType = filterType === 'all' || tx.type === filterType;
+    const matchesType = filterType === 'all'
+      || (filterType === 'income' && (tx.type === 'income' || tx.type === 'savings_in'))
+      || (filterType === 'expense' && (tx.type === 'expense' || tx.type === 'savings_out'));
     return matchesSearch && matchesType;
   }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
@@ -49,10 +72,12 @@ export default function TransactionDataTable({
   };
 
   const handleBulkDelete = () => {
-    if (onBulkDelete) {
-      onBulkDelete(selectedIds);
-      setSelectedIds([]);
+    if (actualBulkDelete) {
+      actualBulkDelete(selectedIds);
+    } else if (handleBulkDeleteTransactions) {
+      handleBulkDeleteTransactions(selectedIds);
     }
+    setSelectedIds([]);
   };
 
   return (
@@ -93,7 +118,7 @@ export default function TransactionDataTable({
           </div>
           
           <button
-            onClick={onAdd}
+            onClick={handleAdd}
             className="w-full sm:w-auto inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 transition-all active:scale-95 whitespace-nowrap"
           >
             <Plus className="-ml-1 mr-2 h-4 w-4" />
@@ -103,7 +128,7 @@ export default function TransactionDataTable({
       </div>
 
       {/* Bulk Actions Toolbar (Conditional) */}
-      {selectedIds.length > 0 && onBulkDelete && (
+      {selectedIds.length > 0 && hasBulkDelete && (
         <div className="bg-blue-50 dark:bg-blue-900/20 px-6 py-3 border-b border-blue-100 dark:border-blue-900/30 flex items-center justify-between animate-in slide-in-from-top-2">
           <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
             {selectedIds.length} transaksi dipilih
@@ -125,7 +150,7 @@ export default function TransactionDataTable({
         <table className="w-full text-left text-sm text-zinc-600 dark:text-zinc-400">
           <thead className="bg-zinc-50/80 dark:bg-zinc-900/80 text-xs font-semibold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 border-b border-zinc-200/50 dark:border-zinc-800/50">
             <tr>
-              {onBulkDelete && (
+              {hasBulkDelete && (
                 <th scope="col" className="px-6 py-4 w-12">
                   <button onClick={toggleSelectAll} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300">
                     {selectedIds.length === filteredTransactions.length && filteredTransactions.length > 0 ? (
@@ -146,17 +171,17 @@ export default function TransactionDataTable({
           <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800/50 bg-white/30 dark:bg-zinc-900/30">
             {filteredTransactions.length === 0 ? (
               <tr>
-                <td colSpan={onBulkDelete ? 6 : 5} className="px-6 py-12 text-center text-zinc-500 dark:text-zinc-400">
+                <td colSpan={hasBulkDelete ? 6 : 5} className="px-6 py-12 text-center text-zinc-500 dark:text-zinc-400">
                   Tidak ada transaksi yang sesuai.
                 </td>
               </tr>
             ) : (
               filteredTransactions.map((tx) => {
-                const isIncome = tx.type === 'income';
+                const isIncome = tx.type === 'income' || tx.type === 'savings_in';
                 const isSelected = selectedIds.includes(tx.id);
                 return (
                   <tr key={tx.id} className={`hover:bg-zinc-50/80 dark:hover:bg-zinc-800/30 transition-all group ${isSelected ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}>
-                    {onBulkDelete && (
+                    {hasBulkDelete && (
                       <td className="px-6 py-4">
                         <button onClick={() => toggleSelect(tx.id)} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300">
                           {isSelected ? (
@@ -185,20 +210,20 @@ export default function TransactionDataTable({
                         {tx.category}
                       </span>
                     </td>
-                    <td className={`px-6 py-4 text-right font-bold whitespace-nowrap ${isIncome ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-900 dark:text-white'}`}>
-                      {isIncome ? '+' : '-'}{formatRupiah(tx.amount)}
+                    <td className={`px-6 py-4 text-right font-bold whitespace-nowrap ${isIncome ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-900 dark:text-white'} ${isPrivacyMode ? 'font-mono' : ''}`}>
+                      {isIncome ? '+' : '-'}{formatCurrency(tx.amount)}
                     </td>
                     <td className="px-6 py-4 text-center">
                       <div className="flex items-center justify-center gap-1 transition-all">
                         <button
-                          onClick={() => onEdit(tx)}
+                          onClick={() => handleEdit(tx)}
                           className="p-1.5 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-500/10 dark:hover:text-blue-400 rounded-md transition-colors"
                           title="Edit"
                         >
                           <Pencil className="h-4 w-4" />
                         </button>
                         <button
-                          onClick={() => onDelete(tx.id)}
+                          onClick={() => handleDelete(tx.id)}
                           className="p-1.5 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 dark:hover:text-rose-400 rounded-md transition-colors"
                           title="Hapus"
                         >

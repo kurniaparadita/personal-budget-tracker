@@ -1,32 +1,58 @@
-'use client';
-
 import { Transaction } from '@/types/budget';
-import { formatRupiah, formatDate } from '@/utils/format';
+import { formatDate } from '@/utils/format';
 import { Pencil, Trash2, Plus, Search, CheckCircle2, Clock, CalendarDays, CheckSquare, Square, Trash } from 'lucide-react';
 import { useState } from 'react';
+import { useBudget } from '@/context/BudgetContext';
 
 interface BillDataTableProps {
   transactions: Transaction[];
-  onAdd: () => void;
-  onEdit: (transaction: Transaction) => void;
-  onDelete: (id: string) => void;
-  onToggleStatus: (transaction: Transaction) => void;
-  onBulkDelete: (ids: string[]) => void;
-  onBulkToggleStatus: (ids: string[], isLunas: boolean) => void;
+  onAdd?: () => void;
+  onAddAction?: () => void;
+  onEdit?: (transaction: Transaction) => void;
+  onEditAction?: (transaction: Transaction) => void;
+  onDelete?: (id: string) => void;
+  onDeleteAction?: (id: string) => void;
+  onToggleStatus?: (transaction: Transaction) => void;
+  onToggleStatusAction?: (transaction: Transaction) => void;
+  onBulkDelete?: (ids: string[]) => void;
+  onBulkDeleteAction?: (ids: string[]) => void;
+  onBulkToggleStatus?: (ids: string[], isLunas: boolean) => void;
+  onBulkToggleStatusAction?: (ids: string[], isLunas: boolean) => void;
 }
 
 export default function BillDataTable({
   transactions,
   onAdd,
+  onAddAction,
   onEdit,
+  onEditAction,
   onDelete,
+  onDeleteAction,
   onToggleStatus,
+  onToggleStatusAction,
   onBulkDelete,
-  onBulkToggleStatus
+  onBulkDeleteAction,
+  onBulkToggleStatus,
+  onBulkToggleStatusAction
 }: BillDataTableProps) {
+  const { 
+    formatCurrency, 
+    isPrivacyMode, 
+    openModal, 
+    openEditModal, 
+    handleDeleteTransaction, 
+    handleBulkDeleteTransactions 
+  } = useBudget();
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'Belum Lunas' | 'Lunas'>('all');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  const handleAdd = onAddAction || onAdd || (() => openModal('Tagihan Online', 'expense'));
+  const handleEdit = onEditAction || onEdit || openEditModal;
+  const handleDelete = onDeleteAction || onDelete || handleDeleteTransaction;
+  const handleToggleStatus = onToggleStatusAction || onToggleStatus;
+  const actualBulkDelete = onBulkDeleteAction || onBulkDelete;
+  const actualBulkToggle = onBulkToggleStatusAction || onBulkToggleStatus;
 
   const filteredBills = transactions.filter(tx => {
     const matchesSearch = tx.description.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -52,17 +78,25 @@ export default function BillDataTable({
   };
 
   const handleBulkDelete = () => {
-    onBulkDelete(selectedIds);
+    if (actualBulkDelete) {
+      actualBulkDelete(selectedIds);
+    } else if (handleBulkDeleteTransactions) {
+      handleBulkDeleteTransactions(selectedIds);
+    }
     setSelectedIds([]);
   };
 
   const handleBulkMarkLunas = () => {
-    onBulkToggleStatus(selectedIds, true);
+    if (actualBulkToggle) {
+      actualBulkToggle(selectedIds, true);
+    }
     setSelectedIds([]);
   };
 
   const handleBulkMarkBelumLunas = () => {
-    onBulkToggleStatus(selectedIds, false);
+    if (actualBulkToggle) {
+      actualBulkToggle(selectedIds, false);
+    }
     setSelectedIds([]);
   };
 
@@ -105,7 +139,7 @@ export default function BillDataTable({
           </div>
           
           <button
-            onClick={onAdd}
+            onClick={handleAdd}
             className="w-full sm:w-auto inline-flex items-center justify-center rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-orange-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600 transition-all active:scale-95 whitespace-nowrap"
           >
             <Plus className="-ml-1 mr-2 h-4 w-4" />
@@ -198,7 +232,7 @@ export default function BillDataTable({
                     <td className="px-4 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-3">
                         <button 
-                          onClick={() => onToggleStatus(tx)}
+                          onClick={() => handleToggleStatus && handleToggleStatus(tx)}
                           className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full border transition-all ${
                             isPaid 
                               ? 'border-emerald-500 bg-emerald-500 text-white' 
@@ -241,20 +275,20 @@ export default function BillDataTable({
                         )}
                       </div>
                     </td>
-                    <td className={`px-6 py-4 text-right font-bold whitespace-nowrap ${isPaid ? 'text-zinc-400' : 'text-zinc-900 dark:text-white'}`}>
-                      {formatRupiah(tx.amount)}
+                    <td className={`px-6 py-4 text-right font-bold whitespace-nowrap ${isPaid ? 'text-zinc-400' : 'text-zinc-900 dark:text-white'} ${isPrivacyMode ? 'font-mono' : ''}`}>
+                      {formatCurrency(tx.amount)}
                     </td>
                     <td className="px-6 py-4 text-center">
                       <div className="flex items-center justify-center gap-1 transition-all">
                         <button
-                          onClick={() => onEdit(tx)}
+                          onClick={() => handleEdit(tx)}
                           className="p-1.5 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-500/10 dark:hover:text-blue-400 rounded-md transition-colors"
                           title="Edit"
                         >
                           <Pencil className="h-4 w-4" />
                         </button>
                         <button
-                          onClick={() => onDelete(tx.id)}
+                          onClick={() => handleDelete(tx.id)}
                           className="p-1.5 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 dark:hover:text-rose-400 rounded-md transition-colors"
                           title="Hapus"
                         >

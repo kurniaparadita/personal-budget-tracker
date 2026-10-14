@@ -2,14 +2,21 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Transaction, TransactionCategory, TransactionType, MonthlyHistory } from '@/types/budget';
+import { Transaction, TransactionCategory, TransactionType, MonthlyHistory, SavingsGoal } from '@/types/budget';
 import TransactionModal from '@/components/dashboard/TransactionModal';
+import GoalModal from '@/components/dashboard/GoalModal';
+import GoalTransactionModal from '@/components/dashboard/GoalTransactionModal';
 import { Trash2 } from 'lucide-react';
+import { formatRupiah } from '@/utils/format';
 
 interface BudgetContextType {
   transactions: Transaction[];
   historyData: MonthlyHistory[];
   isLoading: boolean;
+  dbStatus: { isPaused: boolean; message: string } | null;
+  isPrivacyMode: boolean;
+  togglePrivacyMode: () => void;
+  formatCurrency: (amount: number) => string;
   handleDeleteTransaction: (id: string) => Promise<void>;
   openModal: (category?: TransactionCategory, type?: TransactionType) => void;
   openEditModal: (transaction: Transaction) => void;
@@ -21,7 +28,110 @@ interface BudgetContextType {
   saveMonthlyHistory: (month: number, year: number) => Promise<void>;
   deleteHistory: (id: string) => Promise<void>;
   restoreHistory: (id: string) => Promise<void>;
+  // Dynamic Savings Goal Support
+  savingsGoals: SavingsGoal[];
+  openGoalModal: (goal?: SavingsGoal) => void;
+  closeGoalModal: () => void;
+  handleSaveGoal: (goalData: Partial<SavingsGoal>) => Promise<void>;
+  handleDeleteGoal: (goalId: string) => Promise<void>;
+  openGoalTxModal: (goal: SavingsGoal, defaultType?: 'savings_in' | 'savings_out', tx?: Transaction) => void;
+  closeGoalTxModal: () => void;
+  handleSaveGoalTransaction: (data: { type: 'savings_in' | 'savings_out'; amount: number; description: string; date: string; source_of_fund?: string }) => Promise<void>;
 }
+
+const DEFAULT_FALLBACK_TRANSACTIONS: Transaction[] = [
+  {
+    id: 'fb-1',
+    created_at: new Date().toISOString(),
+    date: new Date().toISOString().split('T')[0],
+    type: 'income',
+    category: 'Pemasukan',
+    description: 'Gaji Bulanan',
+    amount: 15000000,
+    status: 'Lunas',
+  },
+  {
+    id: 'fb-2',
+    created_at: new Date().toISOString(),
+    date: new Date().toISOString().split('T')[0],
+    type: 'expense',
+    category: 'Pengeluaran Wajib',
+    description: 'Sewa Tempat Tinggal / Kost',
+    amount: 2500000,
+    status: 'Lunas',
+  },
+  {
+    id: 'fb-3',
+    created_at: new Date().toISOString(),
+    date: new Date().toISOString().split('T')[0],
+    type: 'expense',
+    category: 'Tagihan Online',
+    description: 'Langganan Internet & WiFi',
+    amount: 350000,
+    status: 'Belum Lunas',
+    platform: 'BCA / QRIS'
+  },
+  {
+    id: 'fb-4',
+    created_at: new Date().toISOString(),
+    date: new Date().toISOString().split('T')[0],
+    type: 'expense',
+    category: 'Opsional',
+    description: 'Makan & Belanja Mingguan',
+    amount: 1200000,
+    status: 'Lunas',
+  },
+  {
+    id: 'fb-5',
+    created_at: new Date().toISOString(),
+    date: new Date().toISOString().split('T')[0],
+    type: 'savings_in',
+    category: 'Tabungan',
+    description: 'Alokasi Reksa Dana Pasar Uang',
+    amount: 2000000,
+    status: 'Lunas',
+  },
+  {
+    id: 'fb-6',
+    created_at: new Date().toISOString(),
+    date: new Date().toISOString().split('T')[0],
+    type: 'savings_in',
+    category: 'Uang Darurat',
+    description: 'Alokasi Deposito Darurat',
+    amount: 1000000,
+    status: 'Lunas',
+  }
+];
+
+const DEFAULT_SAVINGS_GOALS: SavingsGoal[] = [
+  {
+    id: 'goal-qurban',
+    created_at: new Date().toISOString(),
+    name: 'Tabungan Qurban',
+    target_amount: 3500000,
+    color: 'emerald',
+    icon: 'Gift',
+    notes: 'Target ibadah qurban tahun ini'
+  },
+  {
+    id: 'goal-darurat',
+    created_at: new Date().toISOString(),
+    name: 'Uang Darurat',
+    target_amount: 10000000,
+    color: 'amber',
+    icon: 'Shield',
+    notes: 'Dana pengaman kebutuhan mendesak'
+  },
+  {
+    id: 'goal-laptop',
+    created_at: new Date().toISOString(),
+    name: 'Beli Laptop Baru',
+    target_amount: 15000000,
+    color: 'blue',
+    icon: 'Laptop',
+    notes: 'Upgrade laptop kerja'
+  }
+];
 
 const BudgetContext = createContext<BudgetContextType | undefined>(undefined);
 
@@ -29,6 +139,7 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [historyData, setHistoryData] = useState<MonthlyHistory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [dbStatus, setDbStatus] = useState<{ isPaused: boolean; message: string } | null>(null);
   
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -36,23 +147,123 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
   const [modalDefaultCategory, setModalDefaultCategory] = useState<TransactionCategory | undefined>();
   const [modalDefaultType, setModalDefaultType] = useState<TransactionType | undefined>();
 
+  // Savings Goal State
+  const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>([]);
+  const [isGoalModalOpen, setIsGoalModalOpen] = useState(false);
+  const [editingGoal, setEditingGoal] = useState<SavingsGoal | null>(null);
+
+  // Goal Transaction Modal State
+  const [isGoalTxModalOpen, setIsGoalTxModalOpen] = useState(false);
+  const [activeGoalForTx, setActiveGoalForTx] = useState<SavingsGoal | null>(null);
+  const [defaultGoalTxType, setDefaultGoalTxType] = useState<'savings_in' | 'savings_out'>('savings_in');
+  const [editingGoalTx, setEditingGoalTx] = useState<Transaction | null>(null);
+
   // Global Confirm Modal state
   const [isGlobalConfirmOpen, setIsGlobalConfirmOpen] = useState(false);
   const [globalConfirmMessage, setGlobalConfirmMessage] = useState('');
   const [globalConfirmAction, setGlobalConfirmAction] = useState<(() => void) | null>(null);
 
+  // Privacy Mode state (persisted in localStorage)
+  const [isPrivacyMode, setIsPrivacyMode] = useState(false);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('budget_privacy_mode');
+      if (saved === 'true') {
+        setIsPrivacyMode(true);
+      }
+      
+      const savedGoals = localStorage.getItem('budget_savings_goals');
+      if (savedGoals) {
+        setSavingsGoals(JSON.parse(savedGoals));
+      } else {
+        setSavingsGoals(DEFAULT_SAVINGS_GOALS);
+        localStorage.setItem('budget_savings_goals', JSON.stringify(DEFAULT_SAVINGS_GOALS));
+      }
+    } catch {
+      setSavingsGoals(DEFAULT_SAVINGS_GOALS);
+    }
+  }, []);
+
+  const togglePrivacyMode = () => {
+    setIsPrivacyMode((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('budget_privacy_mode', String(next));
+      } catch {
+        // Ignore
+      }
+      return next;
+    });
+  };
+
+  const formatCurrency = (amount: number) => formatRupiah(amount, isPrivacyMode);
+
+  // Helper with 5-second timeout to prevent infinite hanging
+  const fetchWithTimeout = async <T,>(promise: PromiseLike<T>, ms = 5000): Promise<T> => {
+    let timer: NodeJS.Timeout;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        reject(new Error('Koneksi timeout. Supabase kemungkinan sedang di-pause atau jaringan lambat.'));
+      }, ms);
+    });
+
+    try {
+      const result = await Promise.race([promise, timeout]);
+      clearTimeout(timer!);
+      return result;
+    } catch (err) {
+      clearTimeout(timer!);
+      throw err;
+    }
+  };
+
   const fetchTransactions = async () => {
     try {
-      const { data, error } = await supabase
-        .from('transactions')
-        .select('*')
-        .order('date', { ascending: false });
-        
+      const res = await fetchWithTimeout(
+        supabase
+          .from('transactions')
+          .select('*')
+          .order('date', { ascending: false }),
+        5000
+      );
+
+      const { data, error } = res;
       if (error) throw error;
-      if (data) setTransactions(data as Transaction[]);
-    } catch (error) {
+      
+      if (data) {
+        setTransactions(data as Transaction[]);
+        setDbStatus(null);
+        try {
+          localStorage.setItem('budget_cached_transactions', JSON.stringify(data));
+        } catch {}
+      }
+    } catch (error: any) {
       console.error('Error fetching transactions:', error);
-      alert('Gagal mengambil data dari database. Pastikan konfigurasi Supabase benar.');
+      const errMsg = (error?.message || error?.details || JSON.stringify(error) || '').toLowerCase();
+      const isPaused = errMsg.includes('paused') || errMsg.includes('503') || errMsg.includes('timeout') || errMsg.includes('aborted');
+
+      setDbStatus({
+        isPaused: true,
+        message: isPaused
+          ? 'Proyek Supabase Anda sedang di-pause (tidak aktif). Buka dashboard Supabase dan klik "Restore Project" untuk memulihkannya.'
+          : 'Gagal terhubung ke database Supabase. Periksa koneksi internet Anda.'
+      });
+
+      // Load dari cache localStorage atau default fallback agar halaman tetap bisa dibuka
+      try {
+        const cached = localStorage.getItem('budget_cached_transactions');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setTransactions(parsed);
+            return;
+          }
+        }
+      } catch {}
+
+      // Jika cache kosong, gunakan fallback dataset
+      setTransactions((prev) => (prev.length > 0 ? prev : DEFAULT_FALLBACK_TRANSACTIONS));
     } finally {
       setIsLoading(false);
     }
@@ -60,15 +271,19 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
 
   const fetchHistory = async () => {
     try {
-      const { data, error } = await supabase
-        .from('monthly_history')
-        .select('*')
-        .order('year', { ascending: false })
-        .order('month', { ascending: false });
-        
+      const res = await fetchWithTimeout(
+        supabase
+          .from('monthly_history')
+          .select('*')
+          .order('year', { ascending: false })
+          .order('month', { ascending: false }),
+        5000
+      );
+
+      const { data, error } = res;
       if (error) {
         console.error('Error fetching history:', error);
-        return; // Silent fail if table doesn't exist yet
+        return;
       }
       if (data) setHistoryData(data as MonthlyHistory[]);
     } catch (error) {
@@ -81,35 +296,62 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     fetchHistory();
   }, []);
 
+  // Helper to ensure only valid database columns are sent to Supabase
+  const cleanPayload = <T extends Record<string, any>>(data: T, includeId = false): Record<string, any> => {
+    const allowedColumns = [
+      'date',
+      'type',
+      'category',
+      'description',
+      'amount',
+      'status',
+      'platform'
+    ];
+    if (includeId && data.id) {
+      allowedColumns.push('id');
+    }
+    const clean: Record<string, any> = {};
+    for (const key of allowedColumns) {
+      if (key in data && data[key] !== undefined) {
+        clean[key] = data[key];
+      }
+    }
+    return clean;
+  };
+
   const handleUpdateTransaction = async (transaction: Transaction) => {
     try {
+      const payload = cleanPayload(transaction);
       const { error } = await supabase
         .from('transactions')
-        .update(transaction)
+        .update(payload)
         .eq('id', transaction.id);
         
       if (error) throw error;
       
       await fetchTransactions();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating transaction:', error);
-      alert('Gagal mengupdate transaksi');
+      const errMsg = error?.message || error?.details || (typeof error === 'object' ? JSON.stringify(error) : String(error));
+      alert(`Gagal mengupdate transaksi: ${errMsg}`);
     }
   };
 
   const handleBulkUpdateTransactions = async (ids: string[], data: Partial<Transaction>) => {
     try {
+      const payload = cleanPayload(data);
       const { error } = await supabase
         .from('transactions')
-        .update(data)
+        .update(payload)
         .in('id', ids);
         
       if (error) throw error;
       
       await fetchTransactions();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error bulk updating transactions:', error);
-      alert('Gagal mengupdate transaksi');
+      const errMsg = error?.message || error?.details || (typeof error === 'object' ? JSON.stringify(error) : String(error));
+      alert(`Gagal mengupdate transaksi: ${errMsg}`);
     }
   };
 
@@ -117,26 +359,29 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     try {
       if (editingTransaction) {
         // Update
+        const payload = cleanPayload(data);
         const { error } = await supabase
           .from('transactions')
-          .update(data)
+          .update(payload)
           .eq('id', editingTransaction.id);
           
         if (error) throw error;
       } else {
         // Insert
+        const payload = cleanPayload(data, true);
         const { error } = await supabase
           .from('transactions')
-          .insert([data]);
+          .insert([payload]);
           
         if (error) throw error;
       }
       
       await fetchTransactions();
       closeModal();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving transaction:', error);
-      alert('Gagal menyimpan transaksi');
+      const errMsg = error?.message || error?.details || (typeof error === 'object' ? JSON.stringify(error) : String(error));
+      alert(`Gagal menyimpan transaksi: ${errMsg}`);
     }
   };
 
@@ -294,12 +539,117 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
     setModalDefaultType(undefined);
   };
 
+  // --- Dynamic Goal Handlers ---
+  const persistGoals = (goals: SavingsGoal[]) => {
+    setSavingsGoals(goals);
+    try {
+      localStorage.setItem('budget_savings_goals', JSON.stringify(goals));
+    } catch (e) {
+      console.error('Error saving goals to localStorage', e);
+    }
+  };
+
+  const handleSaveGoal = async (goalData: Partial<SavingsGoal>) => {
+    if (editingGoal) {
+      const updated = savingsGoals.map(g => g.id === editingGoal.id ? { ...g, ...goalData } as SavingsGoal : g);
+      persistGoals(updated);
+    } else {
+      const newGoal: SavingsGoal = {
+        id: `goal-${Date.now()}`,
+        created_at: new Date().toISOString(),
+        name: goalData.name || 'Tujuan Baru',
+        target_amount: Number(goalData.target_amount) || 0,
+        color: goalData.color || 'emerald',
+        icon: goalData.icon || 'Target',
+        notes: goalData.notes || ''
+      };
+      persistGoals([...savingsGoals, newGoal]);
+    }
+    setIsGoalModalOpen(false);
+    setEditingGoal(null);
+  };
+
+  const handleDeleteGoal = async (goalId: string) => {
+    const targetGoal = savingsGoals.find(g => g.id === goalId);
+    setGlobalConfirmMessage(`Yakin ingin menghapus tujuan "${targetGoal?.name || 'ini'}"?\nCatatan transaksi terkait akan tetap tersimpan.`);
+    setGlobalConfirmAction(() => async () => {
+      const updated = savingsGoals.filter(g => g.id !== goalId);
+      persistGoals(updated);
+      setIsGlobalConfirmOpen(false);
+    });
+    setIsGlobalConfirmOpen(true);
+  };
+
+  const openGoalModal = (goal?: SavingsGoal) => {
+    setEditingGoal(goal || null);
+    setIsGoalModalOpen(true);
+  };
+
+  const closeGoalModal = () => {
+    setIsGoalModalOpen(false);
+    setEditingGoal(null);
+  };
+
+  const openGoalTxModal = (goal: SavingsGoal, defaultType: 'savings_in' | 'savings_out' = 'savings_in', tx?: Transaction) => {
+    setActiveGoalForTx(goal);
+    setDefaultGoalTxType(defaultType);
+    setEditingGoalTx(tx || null);
+    setIsGoalTxModalOpen(true);
+  };
+
+  const closeGoalTxModal = () => {
+    setIsGoalTxModalOpen(false);
+    setActiveGoalForTx(null);
+    setEditingGoalTx(null);
+  };
+
+  const handleSaveGoalTransaction = async (data: {
+    type: 'savings_in' | 'savings_out';
+    amount: number;
+    description: string;
+    date: string;
+    source_of_fund?: string;
+  }) => {
+    if (!activeGoalForTx) return;
+
+    const defaultStatus = data.type === 'savings_out' ? 'Kembalikan ke Kas Operasional' : 'Potong Kas / Gaji Bulan Ini';
+    const statusValue = data.source_of_fund || defaultStatus;
+
+    if (editingGoalTx) {
+      await handleUpdateTransaction({
+        ...editingGoalTx,
+        type: data.type,
+        amount: data.amount,
+        description: data.description,
+        date: data.date,
+        platform: activeGoalForTx.id,
+        category: 'Tujuan Tabungan',
+        status: statusValue
+      });
+    } else {
+      await handleSaveTransaction({
+        date: data.date,
+        type: data.type,
+        amount: data.amount,
+        description: data.description,
+        category: 'Tujuan Tabungan',
+        platform: activeGoalForTx.id,
+        status: statusValue
+      });
+    }
+    closeGoalTxModal();
+  };
+
   return (
     <BudgetContext.Provider 
       value={{
         transactions,
         historyData,
         isLoading,
+        dbStatus,
+        isPrivacyMode,
+        togglePrivacyMode,
+        formatCurrency,
         handleDeleteTransaction,
         handleUpdateTransaction,
         handleBulkDeleteTransactions,
@@ -310,7 +660,15 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
         fetchHistory,
         saveMonthlyHistory,
         deleteHistory,
-        restoreHistory
+        restoreHistory,
+        savingsGoals,
+        openGoalModal,
+        closeGoalModal,
+        handleSaveGoal,
+        handleDeleteGoal,
+        openGoalTxModal,
+        closeGoalTxModal,
+        handleSaveGoalTransaction
       }}
     >
       {children}
@@ -318,11 +676,29 @@ export function BudgetProvider({ children }: { children: React.ReactNode }) {
       {/* Global Transaction Modal */}
       <TransactionModal 
         isOpen={isModalOpen}
-        onClose={closeModal}
-        onSave={handleSaveTransaction}
+        onCloseAction={closeModal}
+        onSaveAction={handleSaveTransaction}
         initialData={editingTransaction}
         defaultCategory={modalDefaultCategory}
         defaultType={modalDefaultType}
+      />
+
+      {/* Dynamic Goal Modal (Create / Edit Goal) */}
+      <GoalModal
+        isOpen={isGoalModalOpen}
+        onClose={closeGoalModal}
+        onSave={handleSaveGoal}
+        initialData={editingGoal}
+      />
+
+      {/* Goal Specific Transaction Modal (Setor / Tarik per Goal) */}
+      <GoalTransactionModal
+        isOpen={isGoalTxModalOpen}
+        onClose={closeGoalTxModal}
+        goal={activeGoalForTx}
+        defaultType={defaultGoalTxType}
+        initialTransaction={editingGoalTx}
+        onSave={handleSaveGoalTransaction}
       />
 
       {/* Global Confirm Modal for Deletion */}

@@ -21,6 +21,18 @@ export interface Transaction {
   amount: number;
   status: string;
   platform?: string;
+  goal_id?: string;
+  source_of_fund?: string;
+}
+
+export interface SavingsGoal {
+  id: string;
+  created_at: string;
+  name: string; // contoh: "Tabungan Qurban", "Beli Laptop", "Uang Darurat"
+  target_amount: number;
+  color?: 'emerald' | 'blue' | 'purple' | 'amber' | 'rose' | 'teal';
+  icon?: string;
+  notes?: string;
 }
 
 export interface SummaryData {

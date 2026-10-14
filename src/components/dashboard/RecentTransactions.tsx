@@ -1,15 +1,17 @@
 'use client';
 
 import { Transaction } from '@/types/budget';
-import { formatRupiah, formatDate } from '@/utils/format';
+import { formatDate } from '@/utils/format';
 import { ArrowDownRight, ArrowUpRight, Receipt, Target, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
+import { useBudget } from '@/context/BudgetContext';
 
 interface RecentTransactionsProps {
   transactions: Transaction[];
 }
 
 export default function RecentTransactions({ transactions }: RecentTransactionsProps) {
+  const { formatCurrency, isPrivacyMode } = useBudget();
   // Ambil 5 transaksi terakhir
   const recentTx = [...transactions]
     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
@@ -87,8 +89,8 @@ export default function RecentTransactions({ transactions }: RecentTransactionsP
                       </div>
                     </div>
                   </div>
-                  <div className={`text-sm font-bold tracking-tight ${amountClass}`}>
-                    {tx.type === 'income' ? '+' : ''}{formatRupiah(tx.amount)}
+                  <div className={`text-sm font-bold tracking-tight ${amountClass} ${isPrivacyMode ? 'font-mono' : ''}`}>
+                    {tx.type === 'income' ? '+' : ''}{formatCurrency(tx.amount)}
                   </div>
                 </li>
               );

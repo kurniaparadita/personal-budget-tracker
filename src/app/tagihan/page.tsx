@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useBudget } from '@/context/BudgetContext';
 import BillDataTable from '@/components/dashboard/BillDataTable';
 import { FileWarning, CheckCircle2, AlertTriangle, Scale } from 'lucide-react';
-import { formatRupiah } from '@/utils/format';
 import { Transaction } from '@/types/budget';
 
 export default function TagihanPage() {
@@ -12,6 +11,8 @@ export default function TagihanPage() {
   const { 
     transactions, 
     isLoading, 
+    isPrivacyMode,
+    formatCurrency,
     openModal, 
     openEditModal, 
     handleDeleteTransaction, 
@@ -72,7 +73,7 @@ export default function TagihanPage() {
               <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
                 {activeTab === 'Semua' ? 'Total Harus Dibayar' : `Tagihan ${activeTab}`}
               </p>
-              <p className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">{formatRupiah(totalBelumLunas)}</p>
+              <p className={`text-2xl font-bold tracking-tight text-zinc-900 dark:text-white ${isPrivacyMode ? 'font-mono' : ''}`}>{formatCurrency(totalBelumLunas)}</p>
             </div>
           </div>
           {totalBelumLunas > 0 && (
@@ -91,7 +92,7 @@ export default function TagihanPage() {
             </div>
             <div>
               <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Tagihan Lunas</p>
-              <p className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">{formatRupiah(totalLunas)}</p>
+              <p className={`text-2xl font-bold tracking-tight text-zinc-900 dark:text-white ${isPrivacyMode ? 'font-mono' : ''}`}>{formatCurrency(totalLunas)}</p>
             </div>
           </div>
         </div>
@@ -105,7 +106,7 @@ export default function TagihanPage() {
             </div>
             <div>
               <p className="text-sm font-medium text-zinc-500 dark:text-zinc-400">Beban Tagihan</p>
-              <p className="text-xl font-bold tracking-tight text-zinc-900 dark:text-white">{formatRupiah(totalSemua)}</p>
+              <p className={`text-xl font-bold tracking-tight text-zinc-900 dark:text-white ${isPrivacyMode ? 'font-mono' : ''}`}>{formatCurrency(totalSemua)}</p>
             </div>
           </div>
           <div className="w-full relative z-10">
@@ -148,12 +149,12 @@ export default function TagihanPage() {
       <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
         <BillDataTable 
           transactions={displayedBills}
-          onAdd={() => openModal('Tagihan Online', 'expense')}
-          onEdit={openEditModal}
-          onDelete={handleDeleteTransaction}
-          onToggleStatus={toggleStatus}
-          onBulkDelete={handleBulkDeleteTransactions}
-          onBulkToggleStatus={handleBulkToggleStatus}
+          onAddAction={() => openModal('Tagihan Online', 'expense')}
+          onEditAction={openEditModal}
+          onDeleteAction={handleDeleteTransaction}
+          onToggleStatusAction={toggleStatus}
+          onBulkDeleteAction={handleBulkDeleteTransactions}
+          onBulkToggleStatusAction={handleBulkToggleStatus}
         />
       </div>
     </div>

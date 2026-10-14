@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import ThemeToggle from './ThemeToggle';
+import PrivacyToggle from './PrivacyToggle';
 import { Menu } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -40,7 +41,8 @@ export default function Header() {
               {pageTitle}
             </h1>
           </div>
-          <div className="flex items-center gap-x-4 lg:gap-x-6">
+          <div className="flex items-center gap-x-2 sm:gap-x-3">
+            <PrivacyToggle />
             <ThemeToggle />
           </div>
         </div>

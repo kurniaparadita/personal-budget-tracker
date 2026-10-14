@@ -1,7 +1,7 @@
 import { Transaction } from '@/types/budget';
-import { formatRupiah } from '@/utils/format';
 import { Pencil, Trash2, Plus, ArrowUpRight, ArrowDownRight, Wallet, Receipt, Target } from 'lucide-react';
-import { formatDate } from '@/utils/format'; // Assuming we have this, or I'll just use inline format
+import { formatDate } from '@/utils/format';
+import { useBudget } from '@/context/BudgetContext';
 
 interface TransactionSectionProps {
   title: string;
@@ -20,6 +20,7 @@ export default function TransactionSection({
   onDelete,
   totalLabel = 'Total'
 }: TransactionSectionProps) {
+  const { formatCurrency, isPrivacyMode } = useBudget();
   const total = transactions.reduce((sum, tx) => sum + Number(tx.amount), 0);
 
   // Helper to determine icon and colors based on transaction type/category
@@ -131,8 +132,8 @@ export default function TransactionSection({
                   </div>
 
                   <div className="flex items-center gap-4">
-                    <span className={`text-sm font-bold tracking-tight ${amountClass}`}>
-                      {tx.type === 'income' ? '+' : ''}{formatRupiah(tx.amount)}
+                    <span className={`text-sm font-bold tracking-tight ${amountClass} ${isPrivacyMode ? 'font-mono' : ''}`}>
+                      {tx.type === 'income' ? '+' : ''}{formatCurrency(tx.amount)}
                     </span>
                     
                     {/* Action Buttons Container */}
@@ -163,7 +164,7 @@ export default function TransactionSection({
       {/* Footer / Total */}
       <div className="border-t border-zinc-200/50 dark:border-zinc-800/50 px-6 py-4 bg-zinc-50/30 dark:bg-zinc-900/30 flex items-center justify-between">
         <span className="text-sm font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wider">{totalLabel}</span>
-        <span className="text-lg font-bold text-zinc-900 dark:text-white tracking-tight">{formatRupiah(total)}</span>
+        <span className={`text-lg font-bold text-zinc-900 dark:text-white tracking-tight ${isPrivacyMode ? 'font-mono' : ''}`}>{formatCurrency(total)}</span>
       </div>
     </div>
   );

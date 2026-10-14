@@ -2,12 +2,20 @@
 
 import { useState } from 'react';
 import { useBudget } from '@/context/BudgetContext';
-import { formatRupiah } from '@/utils/format';
 import { Archive, Calendar, Trash2, TrendingUp, TrendingDown, RefreshCw, RefreshCcw, X, Receipt, Search } from 'lucide-react';
 import { MonthlyHistory, Transaction } from '@/types/budget';
 
 export default function HistoryPage() {
-  const { transactions, historyData, saveMonthlyHistory, deleteHistory, restoreHistory, isLoading } = useBudget();
+  const { 
+    transactions, 
+    historyData, 
+    saveMonthlyHistory, 
+    deleteHistory, 
+    restoreHistory, 
+    isLoading,
+    isPrivacyMode,
+    formatCurrency
+  } = useBudget();
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
@@ -167,23 +175,23 @@ export default function HistoryPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right font-medium text-emerald-600 dark:text-emerald-400">
-                      {formatRupiah(item.total_income)}
+                    <td className={`px-6 py-4 whitespace-nowrap text-right font-medium text-emerald-600 dark:text-emerald-400 ${isPrivacyMode ? 'font-mono' : ''}`}>
+                      {formatCurrency(item.total_income)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right font-medium text-rose-600 dark:text-rose-400">
-                      {formatRupiah(item.total_expense)}
+                    <td className={`px-6 py-4 whitespace-nowrap text-right font-medium text-rose-600 dark:text-rose-400 ${isPrivacyMode ? 'font-mono' : ''}`}>
+                      {formatCurrency(item.total_expense)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right font-medium text-blue-600 dark:text-blue-400">
-                      {formatRupiah(item.total_savings)}
+                    <td className={`px-6 py-4 whitespace-nowrap text-right font-medium text-blue-600 dark:text-blue-400 ${isPrivacyMode ? 'font-mono' : ''}`}>
+                      {formatCurrency(item.total_savings)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
                       <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold ${
                         item.net_cash_flow >= 0 
                           ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400'
                           : 'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400'
-                      }`}>
+                      } ${isPrivacyMode ? 'font-mono' : ''}`}>
                         {item.net_cash_flow >= 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
-                        {item.net_cash_flow >= 0 ? '+' : '-'}{formatRupiah(Math.abs(item.net_cash_flow))}
+                        {item.net_cash_flow >= 0 ? '+' : '-'}{formatCurrency(Math.abs(item.net_cash_flow))}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-center">
@@ -344,8 +352,8 @@ export default function HistoryPage() {
                       </div>
                       <span className={`font-semibold ${
                         tx.type === 'income' || tx.type === 'savings_in' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
-                      }`}>
-                        {tx.type === 'income' || tx.type === 'savings_in' ? '+' : '-'}{formatRupiah(tx.amount)}
+                      } ${isPrivacyMode ? 'font-mono' : ''}`}>
+                        {tx.type === 'income' || tx.type === 'savings_in' ? '+' : '-'}{formatCurrency(tx.amount)}
                       </span>
                     </div>
                   ))}
