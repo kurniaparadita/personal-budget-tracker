@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useBudget } from '@/context/BudgetContext';
-import { Archive, Calendar, Trash2, TrendingUp, TrendingDown, RefreshCw, RefreshCcw, X, Receipt, Search } from 'lucide-react';
+import { Archive, Calendar, Trash2, TrendingUp, TrendingDown, RefreshCw, RefreshCcw, X, Receipt, Search, CreditCard, PiggyBank, Wallet } from 'lucide-react';
 import { MonthlyHistory, Transaction } from '@/types/budget';
 
 export default function HistoryPage() {
@@ -35,6 +35,54 @@ export default function HistoryPage() {
 
   // Use the snapshot data from the history record
   const selectedMonthTransactionsRaw = selectedHistory?.transactions_snapshot || [];
+
+  // Summary totals for each tab
+  const tagihanRaw = selectedMonthTransactionsRaw.filter(t => t.category === 'Tagihan Online');
+  const totalTagihanOnline = tagihanRaw.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+  const transaksiRaw = selectedMonthTransactionsRaw.filter(t => 
+    ['Pemasukan', 'Pengeluaran Wajib', 'Opsional', 'Admin', 'Transfer Pribadi'].includes(t.category)
+  );
+  const totalTransaksiExpense = transaksiRaw
+    .filter(t => t.type === 'expense')
+    .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+  const totalTransaksiIncome = transaksiRaw
+    .filter(t => t.type === 'income')
+    .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+  const tabunganRaw = selectedMonthTransactionsRaw.filter(t => 
+    ['Tabungan', 'Uang Darurat', 'Tujuan Tabungan'].includes(t.category)
+  );
+  const totalTabunganIn = tabunganRaw
+    .filter(t => t.type === 'savings_in' || t.type === 'income')
+    .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+  const totalTabunganOut = tabunganRaw
+    .filter(t => t.type === 'savings_out' || t.type === 'expense')
+    .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+  const totalTabunganNet = totalTabunganIn - totalTabunganOut;
+
+  // For tab 'Semua', user specifically requested: "dan di tab semua itu hasil total dari pengeluaran"
+  const totalSemuaExpense = selectedMonthTransactionsRaw
+    .filter(t => t.type === 'expense')
+    .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+  const totalSemuaIncome = selectedMonthTransactionsRaw
+    .filter(t => t.type === 'income')
+    .reduce((sum, t) => sum + Number(t.amount || 0), 0);
+
+  const getTabTotal = (tab: string) => {
+    switch (tab) {
+      case 'Semua':
+        return totalSemuaExpense;
+      case 'Transaksi':
+        return totalTransaksiExpense;
+      case 'Tagihan Online':
+        return totalTagihanOnline;
+      case 'Tabungan':
+        return totalTabunganNet >= 0 ? totalTabunganNet : totalTabunganIn;
+      default:
+        return 0;
+    }
+  };
 
   const selectedMonthTransactions = selectedMonthTransactionsRaw.filter(t => {
     // Search filter
@@ -307,21 +355,143 @@ export default function HistoryPage() {
                 />
               </div>
 
-              {/* Tabs */}
+              {/* Tabs with Total Badges */}
               <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-                {['Semua', 'Transaksi', 'Tagihan Online', 'Tabungan'].map((tab) => (
-                  <button
-                    key={tab}
-                    onClick={() => setActiveTab(tab as any)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-                      activeTab === tab
-                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-400'
-                        : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800/50'
-                    }`}
-                  >
-                    {tab}
-                  </button>
-                ))}
+                {(['Semua', 'Transaksi', 'Tagihan Online', 'Tabungan'] as const).map((tab) => {
+                  const amount = getTabTotal(tab);
+                  return (
+                    <button
+                      key={tab}
+                      onClick={() => setActiveTab(tab)}
+                      className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-medium whitespace-nowrap transition-all flex items-center gap-2 ${
+                        activeTab === tab
+                          ? 'bg-blue-600 text-white shadow-sm ring-1 ring-blue-700/50'
+                          : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800/60 ring-1 ring-zinc-200/50 dark:ring-zinc-800/50'
+                      }`}
+                    >
+                      <span>{tab}</span>
+                      <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${
+                        activeTab === tab
+                          ? 'bg-white/20 text-white'
+                          : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300'
+                      } ${isPrivacyMode ? 'font-mono' : ''}`}>
+                        {formatCurrency(amount)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Dynamic Summary Card per Active Tab */}
+              <div className="rounded-xl p-3.5 bg-zinc-50 dark:bg-zinc-900/60 border border-zinc-200/70 dark:border-zinc-800/80">
+                {activeTab === 'Semua' && (
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-500/10 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400">
+                        <TrendingDown className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Total Pengeluaran Bulan Ini</p>
+                        <p className={`text-lg font-bold text-rose-600 dark:text-rose-400 ${isPrivacyMode ? 'font-mono' : ''}`}>
+                          {formatCurrency(totalSemuaExpense)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-4 text-xs">
+                      {totalSemuaIncome > 0 && (
+                        <div className="text-right">
+                          <p className="text-zinc-500 dark:text-zinc-400">Total Pemasukan</p>
+                          <p className={`font-semibold text-emerald-600 dark:text-emerald-400 ${isPrivacyMode ? 'font-mono' : ''}`}>
+                            +{formatCurrency(totalSemuaIncome)}
+                          </p>
+                        </div>
+                      )}
+                      <span className="px-2.5 py-1 rounded-md bg-zinc-200/70 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-medium">
+                        {selectedMonthTransactions.length} Transaksi
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'Tagihan Online' && (
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-500/10 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400">
+                        <CreditCard className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Total Semua Tagihan Online</p>
+                        <p className={`text-lg font-bold text-rose-600 dark:text-rose-400 ${isPrivacyMode ? 'font-mono' : ''}`}>
+                          {formatCurrency(totalTagihanOnline)}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-xs px-2.5 py-1 rounded-md bg-zinc-200/70 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-medium">
+                      {tagihanRaw.length} Tagihan
+                    </span>
+                  </div>
+                )}
+
+                {activeTab === 'Transaksi' && (
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-500/10 text-rose-600 dark:bg-rose-500/20 dark:text-rose-400">
+                        <TrendingDown className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Total Pengeluaran Transaksi</p>
+                        <p className={`text-lg font-bold text-rose-600 dark:text-rose-400 ${isPrivacyMode ? 'font-mono' : ''}`}>
+                          {formatCurrency(totalTransaksiExpense)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-4 text-xs">
+                      {totalTransaksiIncome > 0 && (
+                        <div className="text-right">
+                          <p className="text-zinc-500 dark:text-zinc-400">Pemasukan Operasional</p>
+                          <p className={`font-semibold text-emerald-600 dark:text-emerald-400 ${isPrivacyMode ? 'font-mono' : ''}`}>
+                            +{formatCurrency(totalTransaksiIncome)}
+                          </p>
+                        </div>
+                      )}
+                      <span className="px-2.5 py-1 rounded-md bg-zinc-200/70 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-medium">
+                        {transaksiRaw.length} Transaksi
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'Tabungan' && (
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400">
+                        <PiggyBank className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Total Tabungan Bersih</p>
+                        <p className={`text-lg font-bold text-blue-600 dark:text-blue-400 ${isPrivacyMode ? 'font-mono' : ''}`}>
+                          {formatCurrency(totalTabunganNet)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2.5 py-1 rounded-md font-medium">
+                        Setor: {formatCurrency(totalTabunganIn)}
+                      </span>
+                      {totalTabunganOut > 0 && (
+                        <span className="text-rose-700 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 px-2.5 py-1 rounded-md font-medium">
+                          Tarik: {formatCurrency(totalTabunganOut)}
+                        </span>
+                      )}
+                      <span className="px-2.5 py-1 rounded-md bg-zinc-200/70 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-medium">
+                        {tabunganRaw.length} Mutasi
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
             
